@@ -1,0 +1,59 @@
+Whiterose — v0.0.1
+===================
+C++17 CLI tool: boot guard + fork/execvp passthrough REPL with readline.
+
+Language: C++17, single file main.cpp.
+Dependencies: libreadline (system library, -lreadline).
+Binary: ~/.local/bin/whiterose — accessible from anywhere in PATH.
+
+Architecture (non-negotiable)
+-----------------------------
+The C++ program stays alive as the main loop. Every command passes
+through C++ code first — this is the hook point for every future
+feature (intercept push, reformat status, undo backups, etc.).
+
+Structure:
+  1. Boot guard — detect git repo root
+  2. REPL loop — readline() prints prompt, handles tab completion
+  3. fork() + execvp() into bash -i -c <input>
+  4. waitpid() — control returns to C++
+  5. Loop back to prompt
+
+This is NOT a "git-aware bash launcher" pattern (exec into bash -i).
+That would replace the C++ process entirely, making it impossible
+to intercept or protect anything.
+
+How it works
+------------
+1. Boot guard — checks if current directory is inside a git repo.
+   Walks up parent dirs looking for .git folder.
+   Found → prints "✿ whiterose booted at <REPO_ROOT>".
+   Not found → prints "✿ White Rose: Crimson error. Not a git repository."
+   and exits code 1.
+
+2. REPL loop — readline() prints "✿ whiterose ❯ " prompt with full
+   GNU readline: tab completion (files, dirs), history (up/down arrows),
+   line editing (Ctrl-A/E, etc.). Empty lines skipped, non-empty added
+   to history.
+
+3. Each command is forked and executed via bash -i -c, which loads
+   .bashrc — aliases, functions, colors all work. The -i flag enables
+   interactive shell features (alias expansion, etc.).
+
+4. exit / quit → prints "bye", exits cleanly. Ctrl-D also exits.
+
+Known issues
+------------
+- tmux / tx alias: bash -i -c interferes with tmux terminal handling.
+  Workaround: run tmux outside whiterose, or type full tmux command
+  from normal shell. Fix later if needed.
+
+File structure
+--------------
+main.cpp           — single source file
+whiterose          — compiled binary
+whiterose.txt      — this file
+
+Compile
+-------
+g++ -std=c++17 -Os -s main.cpp -o whiterose -lreadline
