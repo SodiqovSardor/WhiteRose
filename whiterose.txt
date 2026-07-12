@@ -1,59 +1,39 @@
-Whiterose — v0.0.1
+Whiterose — v0.0.9
 ===================
-C++17 CLI tool: boot guard + fork/execvp passthrough REPL with readline.
+C++17 CLI: git-aware safety shell.
 
 Language: C++17, single file main.cpp.
-Dependencies: libreadline (system library, -lreadline).
-Binary: ~/.local/bin/whiterose — accessible from anywhere in PATH.
+Dependencies: libreadline (system library).
+Install: make && sudo make install
+Binary: ~/.local/bin/whiterose or /usr/local/bin/whiterose
 
-Architecture (non-negotiable)
------------------------------
-The C++ program stays alive as the main loop. Every command passes
-through C++ code first — this is the hook point for every future
-feature (intercept push, reformat status, undo backups, etc.).
+Features
+--------
+- Boot guard — detects git repo root, tracks cwd, colorful prompt.
+- Push auto-upstream — bare push auto-adds --set-upstream.
+- Status reformat — color-coded staged/modified/untracked/conflicts.
+- Force-push protection — blocks if remote has commits you don't.
+- Protected branch guard — confirm before pushing to main/master/etc.
+- Backup + undo — saves refs before destructive commands, restores on undo.
+- Smart pull — rebase-if-safe on clean tree, merge fallback if dirty.
+- Lockfile auto-fix — regenerates conflicted package-lock.json et al.
+- Per-repo config — .whiterose.toml for customization.
 
-Structure:
-  1. Boot guard — detect git repo root
-  2. REPL loop — readline() prints prompt, handles tab completion
-  3. fork() + execvp() into bash -i -c <input>
-  4. waitpid() — control returns to C++
-  5. Loop back to prompt
-
-This is NOT a "git-aware bash launcher" pattern (exec into bash -i).
-That would replace the C++ process entirely, making it impossible
-to intercept or protect anything.
-
-How it works
+Architecture
 ------------
-1. Boot guard — checks if current directory is inside a git repo.
-   Walks up parent dirs looking for .git folder.
-   Found → prints "✿ whiterose booted at <REPO_ROOT>".
-   Not found → prints "✿ White Rose: Crimson error. Not a git repository."
-   and exits code 1.
+C++ stays alive as main loop. Every command passes through C++ first.
+fork() + execvp() into bash -i -c for execution. fd-3 pipe tracks cwd.
 
-2. REPL loop — readline() prints "✿ whiterose ❯ " prompt with full
-   GNU readline: tab completion (files, dirs), history (up/down arrows),
-   line editing (Ctrl-A/E, etc.). Empty lines skipped, non-empty added
-   to history.
+Files
+-----
+main.cpp        — single source file
+whiterose       — compiled binary
+README.md       — full documentation
+Makefile        — build + install targets
+demo.sh         — auto-demo for testing
+whiterose.txt   — this file
 
-3. Each command is forked and executed via bash -i -c, which loads
-   .bashrc — aliases, functions, colors all work. The -i flag enables
-   interactive shell features (alias expansion, etc.).
-
-4. exit / quit → prints "bye", exits cleanly. Ctrl-D also exits.
-
-Known issues
-------------
-- tmux / tx alias: bash -i -c interferes with tmux terminal handling.
-  Workaround: run tmux outside whiterose, or type full tmux command
-  from normal shell. Fix later if needed.
-
-File structure
---------------
-main.cpp           — single source file
-whiterose          — compiled binary
-whiterose.txt      — this file
-
-Compile
--------
+Build
+-----
 g++ -std=c++17 -Os -s main.cpp -o whiterose -lreadline
+make
