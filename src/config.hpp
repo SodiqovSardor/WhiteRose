@@ -14,4 +14,5 @@ struct WhiteRoseConfig {
 
 extern WhiteRoseConfig cfg;
 
-WhiteRoseConfig load_config(const std::string &root);
+WhiteRoseConfig load_config(const std::string &root, bool quiet = false);
+bool handle_config_command(const std::string &line, const std::string &repo_root);

@@ -88,6 +88,33 @@ void save_backup() {
     std::cout << "✿ backup saved: " << timestamp << std::endl;
 }
 
+void list_backups() {
+    FILE *fp = popen("git for-each-ref --sort=-refname --format='%(refname:short)' refs/whiterose/backup-* 2>/dev/null | grep -v -- -wip$", "r");
+    if (!fp) { std::cout << "✿ No backups found.\n"; return; }
+    bool any = false;
+    char line[4096];
+    while (fgets(line, sizeof(line), fp)) {
+        size_t n = strlen(line);
+        while (n > 0 && (line[n-1] == '\n' || line[n-1] == '\r')) line[--n] = '\0';
+        if (n == 0) continue;
+        std::string sha = run_capture(("git rev-parse " + std::string(line) + " 2>/dev/null").c_str());
+        if (!any) { std::cout << "✿ Backups:\n"; any = true; }
+        auto bp = std::string(line).find("backup-");
+        std::string ts = (bp != std::string::npos) ? std::string(line).substr(bp + 7) : std::string(line);
+        std::cout << "  " << ts << "  " << sha.substr(0, 7) << std::endl;
+    }
+    pclose(fp);
+    if (!any) std::cout << "✿ No backups found.\n";
+}
+
+bool handle_backups_command(const std::string &line) {
+    std::string cmd = line;
+    auto f = cmd.find_first_not_of(" \t");
+    if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+    if (cmd == "backups") { list_backups(); return true; }
+    return false;
+}
+
 void undo() {
     FILE *fp = popen("git for-each-ref --sort=-refname --format='%(refname)' refs/whiterose/backup-* 2>/dev/null | grep -v -- -wip$", "r");
     if (!fp) { std::cout << "✿ Nothing to undo — no backups found.\n"; return; }

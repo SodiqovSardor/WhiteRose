@@ -28,10 +28,21 @@ bool handle_aliases(const std::string &line, std::string &new_line) {
             std::cout << "✿ (running: git checkout " << tok[1] << ")\n";
             new_line = "git checkout " + tok[1];
         } else if (tok[0] == "save") {
-            std::cout << "✿ Commit message: " << std::flush;
             std::string msg;
-            std::getline(std::cin, msg);
-            if (msg.empty()) { std::cout << "✿ Commit cancelled — message required.\n"; return true; }
+            if (tok.size() >= 3 && tok[1] == "-m") {
+                // collect quoted message (may span multiple tokens)
+                for (size_t ti = 2; ti < tok.size(); ti++) {
+                    if (ti > 2) msg += ' ';
+                    msg += tok[ti];
+                }
+                // strip outer quotes if present
+                if (msg.size() >= 2 && msg.front() == '"' && msg.back() == '"')
+                    msg = msg.substr(1, msg.size() - 2);
+            } else {
+                std::cout << "✿ Commit message: " << std::flush;
+                std::getline(std::cin, msg);
+                if (msg.empty()) { std::cout << "✿ Commit cancelled — message required.\n"; return true; }
+            }
             for (size_t i = 0; i < msg.size(); i++)
                 if (msg[i] == '"' || msg[i] == '\\') { msg.insert(i, 1, '\\'); i++; }
             std::cout << "✿ (running: git add -A && git commit -m \"" << msg << "\")\n";

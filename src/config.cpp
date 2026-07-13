@@ -12,7 +12,7 @@ static std::string to_lower(std::string s) {
     return s;
 }
 
-WhiteRoseConfig load_config(const std::string &root) {
+WhiteRoseConfig load_config(const std::string &root, bool quiet) {
     WhiteRoseConfig cfg;
     std::string path = root + "/.whiterose.toml";
     FILE *fp = fopen(path.c_str(), "r");
@@ -88,6 +88,18 @@ WhiteRoseConfig load_config(const std::string &root) {
         }
     }
     fclose(fp);
-    std::cout << "✿ loaded .whiterose.toml (" << cfg.protected_branches.size() << " protected branches)" << std::endl;
+    if (!quiet)
+        std::cout << "✿ loaded .whiterose.toml (" << cfg.protected_branches.size() << " protected branches)" << std::endl;
     return cfg;
+}
+
+bool handle_config_command(const std::string &line, const std::string &repo_root) {
+    std::string cmd = line;
+    auto f = cmd.find_first_not_of(" \t");
+    if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+    if (cmd == "config reload") {
+        cfg = load_config(repo_root, true);
+        return true;
+    }
+    return false;
 }

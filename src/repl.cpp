@@ -80,6 +80,12 @@ void run_repl(const std::string &REPO_ROOT) {
         if (line == "help") { print_help(true); continue; }
         if (!line.empty()) add_history(line.c_str());
 
+        // config reload
+        if (handle_config_command(line, REPO_ROOT)) continue;
+
+        // backups list
+        if (handle_backups_command(line)) continue;
+
         // teach on/off
         if (handle_teach_command(line)) continue;
 
