@@ -1,6 +1,0 @@
-# whiterose config — see README for all options
-protected_branches = ["main", "master"]
-auto_upstream = true
-smart_pull = true
-backup_on_destructive = true
-novice_mode = false

@@ -1,1 +1,15 @@
-whiterose\n*.o\nsrc/*.o\nsrc/interceptors/*.o
+# build artifacts
+whiterose
+*.o
+src/*.o
+src/interceptors/*.o
+
+# editor/OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# generated config (user-specific)
+.whiterose.toml
