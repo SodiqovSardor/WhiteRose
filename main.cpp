@@ -544,50 +544,49 @@ static std::string find_repo_root() {
 }
 
 // tab completion: branch names for checkout/switch/merge/rebase/branch
-static char **branch_complete(const char *text, int start, int end) {
-    (void)end;
-    std::string linebuf(rl_line_buffer);
-    auto tok = split_words(linebuf);
-    if (tok.empty()) return nullptr;
+static char *branch_gen(const char *text, int state) {
+    static std::vector<std::string> matches;
+    static size_t idx;
+    if (state == 0) {
+        matches.clear(); idx = 0;
+        std::string linebuf(rl_line_buffer);
+        auto tok = split_words(linebuf);
+        if (tok.size() < 2) return nullptr;
+        // first token must be a branch-command or "git" + branch-command
+        size_t ci = (tok[0] == "git" && tok.size() >= 3) ? 1 : 0;
+        const std::string &c = tok[ci];
+        if (!(c == "checkout" || c == "switch" || c == "merge" ||
+              c == "rebase" || c == "branch"))
+            return nullptr;
+        if (c == "checkout") {
+            for (size_t i = ci + 1; i < tok.size(); i++)
+                if (tok[i] == "-b") return nullptr;
+        }
+        if (text[0] == '-') return nullptr;
 
-    size_t ci = 0;
-    if (tok[0] == "git" && tok.size() >= 2) ci = 1;
-    if (ci >= tok.size()) return nullptr;
-
-    const std::string &c = tok[ci];
-    bool is_bc = (c == "checkout" || c == "switch" || c == "merge" ||
-                  c == "new-branch" || c == "rebase" || c == "branch");
-    if (!is_bc) return nullptr;
-
-    // skip for new-branch and checkout -b (user chooses the name)
-    if (c == "new-branch") return nullptr;
-    if (c == "checkout") {
-        for (size_t i = ci + 1; i < tok.size(); i++)
-            if (tok[i] == "-b") return nullptr;
+        // also include remote branches, stripping origin/ prefix
+        FILE *fp = popen("git branch -a --format='%(refname:short)' 2>/dev/null", "r");
+        if (!fp) return nullptr;
+        char buf[4096];
+        size_t tlen = strlen(text);
+        while (fgets(buf, sizeof(buf), fp)) {
+            size_t n = strlen(buf);
+            while (n > 0 && (buf[n-1] == '\n' || buf[n-1] == '\r')) buf[--n] = '\0';
+            if (n == 0) continue;
+            std::string name(buf);
+            // strip remote prefix
+            auto slash = name.rfind('/');
+            if (name.compare(0, 8, "remotes/") == 0 && slash != std::string::npos)
+                name = name.substr(slash + 1);
+            // skip HEAD ref
+            if (name == "HEAD") continue;
+            if (tlen == 0 || name.compare(0, tlen, text) == 0)
+                matches.push_back(name);
+        }
+        pclose(fp);
     }
-    if (text[0] == '-') return nullptr;
-
-    FILE *fp = popen("git for-each-ref --format='%(refname:short)' refs/heads/ 2>/dev/null", "r");
-    if (!fp) return nullptr;
-
-    std::vector<std::string> matches;
-    char buf[4096];
-    size_t tlen = strlen(text);
-    while (fgets(buf, sizeof(buf), fp)) {
-        size_t n = strlen(buf);
-        while (n > 0 && (buf[n-1] == '\n' || buf[n-1] == '\r')) buf[--n] = '\0';
-        if (n > 0 && (tlen == 0 || strncmp(buf, text, tlen) == 0))
-            matches.push_back(buf);
-    }
-    pclose(fp);
-
-    if (matches.empty()) return nullptr;
-    rl_attempted_completion_over = 1;
-    char **res = (char **)malloc((matches.size() + 1) * sizeof(char *));
-    for (size_t i = 0; i < matches.size(); i++)
-        res[i] = strdup(matches[i].c_str());
-    res[matches.size()] = nullptr;
-    return res;
+    if (idx < matches.size()) return strdup(matches[idx++].c_str());
+    return nullptr;
 }
 
 static void print_help(bool inside) {
@@ -633,7 +632,9 @@ int main(int argc, char **argv) {
     std::cout << "✿ whiterose v" << VERSION << " booted at " << REPO_ROOT << std::endl;
     cfg = load_config(REPO_ROOT);
 
-    rl_attempted_completion_function = branch_complete;
+    rl_completion_entry_function = branch_gen;
+    rl_completion_append_character = '\0';
+    rl_variable_bind("show-all-if-ambiguous", "on");
 
     char *input;
     while ((input = readline(make_prompt().c_str())) != nullptr) {
