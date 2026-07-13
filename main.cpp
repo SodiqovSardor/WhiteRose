@@ -1,4 +1,4 @@
-// whiterose v1.0.0 — git-aware shell with destructive-command protection, smart defaults, and conflict tooling
+// whiterose v1.1.0 — git-aware shell with destructive-command protection, smart defaults, conflict tooling, and novice mode
 
 #include <iostream>
 #include <string>
@@ -14,7 +14,7 @@
 #include <ctime>
 #include <cctype>
 
-static const char *VERSION = "1.0.0";
+static const char *VERSION = "1.1.0";
 
 static std::vector<std::string> split_words(const std::string &s) {
     std::vector<std::string> r;
@@ -273,6 +273,7 @@ struct WhiteRoseConfig {
     bool auto_upstream = true;
     bool smart_pull = true;
     bool backup_on_destructive = true;
+    bool novice_mode = false;
 };
 
 static WhiteRoseConfig load_config(const std::string &root) {
@@ -328,6 +329,11 @@ static WhiteRoseConfig load_config(const std::string &root) {
             auto lv = to_lower(v);
             if (lv == "true") cfg.backup_on_destructive = true;
             else if (lv == "false") cfg.backup_on_destructive = false;
+            else { std::cerr << "✿ warning: could not parse line " << lineno << " in .whiterose.toml\n"; }
+        } else if (k == "novice_mode") {
+            auto lv = to_lower(v);
+            if (lv == "true") cfg.novice_mode = true;
+            else if (lv == "false") cfg.novice_mode = false;
             else { std::cerr << "✿ warning: could not parse line " << lineno << " in .whiterose.toml\n"; }
         } else {
             std::cerr << "✿ warning: could not parse line " << lineno << " in .whiterose.toml\n";
@@ -540,6 +546,13 @@ static void print_help(bool inside) {
         "  rebase            creates an automatic backup before running\n"
         "  undo              restores your most recent backup\n"
         "  commit            blocked if unresolved merge conflicts remain\n\n"
+        "Beginner aliases (always on):\n"
+        "  new-branch <name>  creates a new branch and switches to it\n"
+        "  switch <name>      switches to an existing branch\n"
+        "  save               stages all changes and commits them\n"
+        "  sync               pull latest changes from remote\n"
+        "  share              push your changes to the remote\n"
+        "  teach on/off       toggle plain-language explanations\n\n"
         "Config: place a .whiterose.toml in your repo root to customize\n"
         "protected branches and toggle features. See README for format.\n\n"
         "Exit the shell any time with 'exit' or Ctrl-D.\n";
@@ -571,6 +584,80 @@ int main(int argc, char **argv) {
         if (line == "help") { print_help(true); continue; }
 
         if (!line.empty()) add_history(line.c_str());
+
+        // --- teach on/off toggle ---
+        {
+            std::string cmd = line;
+            auto f = cmd.find_first_not_of(" \t");
+            if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+            if (cmd == "teach on") { cfg.novice_mode = true; std::cout << "✿ Novice mode ON — I'll explain what commands do before running them.\n"; continue; }
+            if (cmd == "teach off") { cfg.novice_mode = false; std::cout << "✿ Novice mode OFF.\n"; continue; }
+        }
+        // --- end teach toggle ---
+
+        // --- beginner aliases (always on) ---
+        {
+            std::string cmd = line;
+            auto f = cmd.find_first_not_of(" \t");
+            if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+            auto tok = split_words(cmd);
+            if (!tok.empty()) {
+                if (tok[0] == "new-branch" && tok.size() >= 2) {
+                    std::cout << "✿ (running: git checkout -b " << tok[1] << ")\n";
+                    line = "git checkout -b " + tok[1];
+                } else if (tok[0] == "switch" && tok.size() >= 2) {
+                    std::cout << "✿ (running: git checkout " << tok[1] << ")\n";
+                    line = "git checkout " + tok[1];
+                } else if (tok[0] == "save") {
+                    std::cout << "✿ Commit message: " << std::flush;
+                    std::string msg;
+                    std::getline(std::cin, msg);
+                    if (msg.empty()) { std::cout << "✿ Commit cancelled — message required.\n"; continue; }
+                    for (size_t i = 0; i < msg.size(); i++)
+                        if (msg[i] == '"' || msg[i] == '\\') { msg.insert(i, 1, '\\'); i++; }
+                    std::cout << "✿ (running: git add -A && git commit -m \"" << msg << "\")\n";
+                    line = "git add -A && git commit -m \"" + msg + "\"";
+                } else if (tok[0] == "sync") {
+                    std::cout << "✿ (running: git pull)\n";
+                    line = "git pull";
+                } else if (tok[0] == "share") {
+                    std::cout << "✿ (running: git push)\n";
+                    line = "git push";
+                }
+            }
+        }
+        // --- end aliases ---
+
+        // --- novice mode explanations ---
+        if (cfg.novice_mode) {
+            std::string cmd = line;
+            auto f = cmd.find_first_not_of(" \t");
+            if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+            auto tok = split_words(cmd);
+            size_t s = 0;
+            if (tok.size() >= 2 && tok[0] == "git") s = 1;
+            if (s < tok.size()) {
+                const auto &c = tok[s];
+                if (c == "checkout" && s + 1 < tok.size() && tok[s+1] == "-b" && s + 2 < tok.size())
+                    std::cout << "✿ Creating a new branch called '" << tok[s+2] << "' — your own space to make changes without affecting others.\n";
+                else if (c == "checkout" && s + 1 < tok.size() && tok[s+1][0] != '-')
+                    std::cout << "✿ Switching to branch '" << tok[s+1] << "'.\n";
+                else if (c == "branch" && s + 1 < tok.size() && tok[s+1][0] != '-')
+                    std::cout << "✿ Creating a new branch called '" << tok[s+1] << "' — your own space to make changes without affecting others.\n";
+                else if (c == "add") {
+                    std::string p = (s + 1 < tok.size()) ? tok[s+1] : ".";
+                    std::cout << "✿ Staging " << p << " — marking it ready to be included in your next commit.\n";
+                } else if (c == "commit")
+                    std::cout << "✿ Saving a snapshot of your staged changes with a message.\n";
+                else if (c == "push" && s + 1 >= tok.size())
+                    std::cout << "✿ Uploading your commits to the shared remote repository.\n";
+                else if (c == "pull" && s + 1 >= tok.size())
+                    std::cout << "✿ Downloading and merging the latest changes from the remote.\n";
+                else if (c == "merge" && s + 1 < tok.size())
+                    std::cout << "✿ Combining changes from '" << tok[s+1] << "' into your current branch.\n";
+            }
+        }
+        // --- end novice mode ---
 
         // --- status reformat intercept ---
         {
