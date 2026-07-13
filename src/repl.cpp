@@ -294,7 +294,21 @@ void run_repl(const std::string &REPO_ROOT) {
             buf[n] = '\0';
             std::string d(buf);
             while (!d.empty() && (d.back() == '\n' || d.back() == '\r')) d.pop_back();
-            if (!d.empty()) chdir(d.c_str());
+            if (!d.empty()) {
+                chdir(d.c_str());
+                // check if we entered a new git repo root
+                if (fs::exists(".git") && fs::current_path().string() != REPO_ROOT) {
+                    std::cout << "✿ Entered a different git repo. Launch whiterose here? [Y/n] " << std::flush;
+                    std::string reply;
+                    std::getline(std::cin, reply);
+                    if (reply != "n" && reply != "N") {
+                        write_history(histfile().c_str());
+                        execlp("whiterose", "whiterose", nullptr);
+                        // if exec fails, continue
+                        std::cerr << "✿ Could not restart whiterose — continuing in current session\n";
+                    }
+                }
+            }
         }
         close(pfd[0]);
 
