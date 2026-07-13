@@ -1,0 +1,9 @@
+#pragma once
+#include <string>
+#include <vector>
+
+bool handle_undo_command(const std::string &line);
+bool handle_backup(const std::string &line);
+bool is_destructive(const std::vector<std::string> &tok);
+void save_backup();
+void undo();
