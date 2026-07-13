@@ -33,7 +33,7 @@ bool is_destructive(const std::vector<std::string> &tok) {
     if (c == "push") {
         bool f = false, fl = false;
         for (size_t i = s + 1; i < tok.size(); i++) {
-            if (tok[i] == "--force-with-lease") fl = true;
+            if (tok[i].compare(0, 20, "--force-with-lease") == 0) fl = true;
             if (tok[i] == "--force" || tok[i] == "-f") f = true;
         }
         return f && !fl;

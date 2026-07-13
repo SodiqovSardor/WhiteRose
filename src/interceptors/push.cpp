@@ -20,7 +20,7 @@ bool handle_push_interceptors(const std::string &line, std::string &new_line) {
             bool has_f = false, has_fwl = false;
             std::vector<std::string> rest;
             for (size_t i = pi + 1; i < tok.size(); i++) {
-                if (tok[i] == "--force-with-lease") has_fwl = true;
+                if (tok[i].compare(0, 20, "--force-with-lease") == 0) has_fwl = true;
                 else if (tok[i] == "--force" || tok[i] == "-f") has_f = true;
                 else if (tok[i][0] != '-') rest.push_back(tok[i]);
             }
