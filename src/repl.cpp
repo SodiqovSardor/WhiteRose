@@ -15,6 +15,8 @@
 #include <filesystem>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <pwd.h>
+#include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -70,8 +72,14 @@ void print_help(bool inside) {
         "Exit the shell any time with 'exit' or Ctrl-D.\n";
 }
 
+static std::string histfile() {
+    struct passwd *pw = getpwuid(getuid());
+    return pw ? std::string(pw->pw_dir) + "/.whiterose_history" : "~/.whiterose_history";
+}
+
 void run_repl(const std::string &REPO_ROOT) {
     setup_completion();
+    read_history(histfile().c_str());
     char *input;
     while ((input = readline(make_prompt(REPO_ROOT.size()).c_str())) != nullptr) {
         std::string line(input);
@@ -124,13 +132,22 @@ void run_repl(const std::string &REPO_ROOT) {
         // --- fork + exec ---
         int pfd[2];
         pipe(pfd);
+        // ignore SIGINT in parent — child handles it
+        struct sigaction sa_old, sa_ign;
+        sa_ign.sa_handler = SIG_IGN;
+        sigemptyset(&sa_ign.sa_mask);
+        sa_ign.sa_flags = 0;
+        sigaction(SIGINT, &sa_ign, &sa_old);
+
         pid_t pid = fork();
         if (pid < 0) {
+            sigaction(SIGINT, &sa_old, nullptr);
             std::cerr << "✿ fork failed — skipping command\n";
             close(pfd[0]); close(pfd[1]);
             continue;
         }
         if (pid == 0) {
+            signal(SIGINT, SIG_DFL);
             close(pfd[0]);
             dup2(pfd[1], 3);
             close(pfd[1]);
@@ -140,6 +157,7 @@ void run_repl(const std::string &REPO_ROOT) {
         }
         close(pfd[1]);
         waitpid(pid, nullptr, 0);
+        sigaction(SIGINT, &sa_old, nullptr);
 
         char buf[4096];
         ssize_t n = read(pfd[0], buf, sizeof(buf) - 1);
@@ -155,4 +173,5 @@ void run_repl(const std::string &REPO_ROOT) {
         if (is_pull_merge_rebase(cmd_line))
             check_lockfile_conflicts(REPO_ROOT);
     }
+    write_history(histfile().c_str());
 }

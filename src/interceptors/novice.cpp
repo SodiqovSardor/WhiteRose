@@ -21,10 +21,12 @@ bool handle_aliases(const std::string &line, std::string &new_line) {
     if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
     auto tok = split_words(cmd);
     if (!tok.empty()) {
-        if (tok[0] == "new-branch" && tok.size() >= 2) {
+        if (tok[0] == "new-branch") {
+            if (tok.size() < 2) { std::cout << "✿ Usage: new-branch <name>\n"; return true; }
             std::cout << "✿ (running: git checkout -b " << tok[1] << ")\n";
             new_line = "git checkout -b " + tok[1];
-        } else if (tok[0] == "switch" && tok.size() >= 2) {
+        } else if (tok[0] == "switch") {
+            if (tok.size() < 2) { std::cout << "✿ Usage: switch <branch>\n"; return true; }
             std::cout << "✿ (running: git checkout " << tok[1] << ")\n";
             new_line = "git checkout " + tok[1];
         } else if (tok[0] == "save") {
