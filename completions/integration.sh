@@ -2,13 +2,12 @@
 # source this in your .bashrc / .zshrc:
 #   source /path/to/whiterose/integration.sh
 #
-# Automatically launches whiterose when you cd into a git repo root.
-# Prompts once per repo per session (per PWD).
+# Prompts to enter whiterose every time you cd into a git repo root.
+# Say Y or press Enter → whiterose starts. Say n → stays in shell.
+# Exiting whiterose returns to your shell.
 
 __whiterose_cd_hook() {
     if [ ! -e .git ]; then return; fi
-    if [ "$WHITEROSE_LAST_REPO" = "$PWD" ]; then return; fi
-    export WHITEROSE_LAST_REPO="$PWD"
 
     echo -n "✿ Enter whiterose? [Y/n] "
     read -r __wr_reply
@@ -19,7 +18,6 @@ __whiterose_cd_hook() {
 }
 
 if [ -n "$BASH_VERSION" ]; then
-    # override cd — fires only on explicit cd, read works reliably
     cd() {
         builtin cd "$@" || return
         __whiterose_cd_hook
