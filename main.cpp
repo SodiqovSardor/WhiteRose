@@ -280,7 +280,21 @@ static WhiteRoseConfig load_config(const std::string &root) {
     WhiteRoseConfig cfg;
     std::string path = root + "/.whiterose.toml";
     FILE *fp = fopen(path.c_str(), "r");
-    if (!fp) return cfg;
+    if (!fp) {
+        // auto-create with defaults
+        fp = fopen(path.c_str(), "w");
+        if (fp) {
+            fprintf(fp, "# whiterose config — see README for all options\n");
+            fprintf(fp, "protected_branches = [\"main\", \"master\"]\n");
+            fprintf(fp, "auto_upstream = true\n");
+            fprintf(fp, "smart_pull = true\n");
+            fprintf(fp, "backup_on_destructive = true\n");
+            fprintf(fp, "novice_mode = false\n");
+            fclose(fp);
+            std::cout << "✿ created .whiterose.toml with defaults\n";
+        }
+        return cfg;
+    }
     char line[1024];
     int lineno = 0;
     while (fgets(line, sizeof(line), fp)) {
