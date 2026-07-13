@@ -23,7 +23,7 @@ static void parseAndPrintStatus() {
             char val[1024] = {};
             if (sscanf(line, "# branch.head %1023[^\n]", val) == 1) branch = val;
             else if (sscanf(line, "# branch.upstream %1023[^\n]", val) == 1) upstream = val;
-            else if (sscanf(line, "# branch.ab %d %d", &ahead, &behind) >= 1) ;
+            else { sscanf(line, "# branch.ab %d %d", &ahead, &behind); }
         } else if (line[0] == '?' && line[1] == ' ') {
             untracked.push_back(line + 2);
         } else if ((line[0] == '1' || line[0] == '2') && line[1] == ' ') {
