@@ -8,7 +8,7 @@ SRCS += $(wildcard src/*.cpp)
 SRCS += $(wildcard src/interceptors/*.cpp)
 OBJS := $(SRCS:.cpp=.o)
 
-.PHONY: all clean format install install-user install-mac install-completions install-man
+.PHONY: all clean format install install-user install-mac install-completions install-man install-integration
 
 all: $(BINARY)
 
@@ -24,7 +24,7 @@ format:
 clean:
 	rm -f $(OBJS) $(BINARY)
 
-install: $(BINARY) install-man install-completions
+install: $(BINARY) install-man install-completions install-integration
 	install -d $(DESTDIR)/usr/local/bin
 	install -m 755 $(BINARY) $(DESTDIR)/usr/local/bin/$(BINARY)
 
@@ -45,3 +45,7 @@ install-completions:
 install-man:
 	install -d $(DESTDIR)/usr/share/man/man1
 	install -m 644 whiterose.1 $(DESTDIR)/usr/share/man/man1/whiterose.1
+
+install-integration:
+	install -d $(DESTDIR)/usr/share/whiterose
+	install -m 644 completions/integration.sh $(DESTDIR)/usr/share/whiterose/integration.sh
