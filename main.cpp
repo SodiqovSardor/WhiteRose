@@ -895,6 +895,26 @@ int main(int argc, char **argv) {
         }
         // --- end backup ---
 
+        // normalize bare git subcommands (checkout, merge, rebase, etc.) to "git <cmd>"
+        {
+            std::string cmd = line;
+            auto f = cmd.find_first_not_of(" \t");
+            if (f != std::string::npos) { auto l = cmd.find_last_not_of(" \t"); cmd = cmd.substr(f, l - f + 1); }
+            if (cmd.compare(0, 4, "git ") != 0) {
+                auto tok = split_words(cmd);
+                if (!tok.empty()) {
+                    const std::string &first = tok[0];
+                    if (first == "checkout" || first == "merge" || first == "rebase" ||
+                        first == "branch" || first == "add" || first == "commit" ||
+                        first == "log" || first == "diff" || first == "show" ||
+                        first == "reset" || first == "clean" || first == "fetch" ||
+                        first == "remote" || first == "stash" || first == "tag")
+                        line = "git " + line.substr(line.find_first_not_of(" \t"));
+                }
+            }
+        }
+        // --- end normalization ---
+
         int pfd[2];
         pipe(pfd);
 
