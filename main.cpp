@@ -1,4 +1,4 @@
-// whiterose v0.0.10 — boot guard + fork/execvp passthrough REPL + push auto-upstream + status reformat + force-push protection + protected branch confirmation + backup/undo + smart pull + per-repo config + lockfile auto-fix + conflict display + commit guard
+// whiterose v1.0.0 — git-aware shell with destructive-command protection, smart defaults, and conflict tooling
 
 #include <iostream>
 #include <string>
@@ -13,6 +13,8 @@
 #include <vector>
 #include <ctime>
 #include <cctype>
+
+static const char *VERSION = "1.0.0";
 
 static std::vector<std::string> split_words(const std::string &s) {
     std::vector<std::string> r;
@@ -521,13 +523,40 @@ static std::string find_repo_root() {
     return {};
 }
 
-int main() {
+static void print_help(bool inside) {
+    std::cout << "whiterose v" << VERSION << " — a git-aware shell that protects you from\n"
+        "destructive mistakes.\n\n";
+    if (!inside) std::cout << "Usage: whiterose (run inside a git repository)\n\n";
+    std::cout << "Intercepted behavior:\n"
+        "  push              auto-sets upstream if missing\n"
+        "  push --force/-f   blocked if remote has commits you don't have\n"
+        "                     (use --force-with-lease if you're sure)\n"
+        "  pull              uses --rebase automatically when working tree\n"
+        "                     is clean, falls back to merge if dirty\n"
+        "  status / st       clean, color-coded summary\n"
+        "  reset --hard,\n"
+        "  checkout --,\n"
+        "  clean -f*,\n"
+        "  rebase            creates an automatic backup before running\n"
+        "  undo              restores your most recent backup\n"
+        "  commit            blocked if unresolved merge conflicts remain\n\n"
+        "Config: place a .whiterose.toml in your repo root to customize\n"
+        "protected branches and toggle features. See README for format.\n\n"
+        "Exit the shell any time with 'exit' or Ctrl-D.\n";
+}
+
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        std::string flag(argv[1]);
+        if (flag == "--version" || flag == "-v") { std::cout << "whiterose v" << VERSION << std::endl; return 0; }
+        if (flag == "--help" || flag == "-h") { print_help(false); return 0; }
+    }
     std::string REPO_ROOT = find_repo_root();
     if (REPO_ROOT.empty()) {
         std::cout << "✿ White Rose: Crimson error. Not a git repository.\n";
         return 1;
     }
-    std::cout << "✿ whiterose booted at " << REPO_ROOT << std::endl;
+    std::cout << "✿ whiterose v" << VERSION << " booted at " << REPO_ROOT << std::endl;
     cfg = load_config(REPO_ROOT);
 
     char *input;
@@ -539,6 +568,7 @@ int main() {
             std::cout << "bye\n";
             break;
         }
+        if (line == "help") { print_help(true); continue; }
 
         if (!line.empty()) add_history(line.c_str());
 
@@ -718,6 +748,11 @@ int main() {
         pipe(pfd);
 
         pid_t pid = fork();
+        if (pid < 0) {
+            std::cerr << "✿ fork failed — skipping command\n";
+            close(pfd[0]); close(pfd[1]);
+            continue;
+        }
         if (pid == 0) {
             close(pfd[0]);
             dup2(pfd[1], 3);
