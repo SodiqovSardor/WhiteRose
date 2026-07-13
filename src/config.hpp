@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#define WHITEROSE_VERSION "1.1.0"
+#define WHITEROSE_VERSION "1.2.0"
 
 struct WhiteRoseConfig {
     std::vector<std::string> protected_branches = {"main", "master"};

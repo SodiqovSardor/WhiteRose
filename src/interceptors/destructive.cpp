@@ -39,6 +39,70 @@ bool is_destructive(const std::vector<std::string> &tok) {
         return f && !fl;
     }
     if (c == "rebase") return true;
+    if (c == "branch") {
+        for (size_t i = s + 1; i < tok.size(); i++)
+            if (tok[i] == "-D" || tok[i] == "-d" || tok[i] == "--delete") return true;
+        return false;
+    }
+    if (c == "stash") {
+        for (size_t i = s + 1; i < tok.size(); i++)
+            if (tok[i] == "drop" || tok[i] == "clear") return true;
+        return false;
+    }
+    if (c == "rm") return true;
+    if (c == "tag") {
+        for (size_t i = s + 1; i < tok.size(); i++)
+            if (tok[i] == "-d" || tok[i] == "--delete") return true;
+        return false;
+    }
+    if (c == "commit") {
+        for (size_t i = s + 1; i < tok.size(); i++)
+            if (tok[i] == "--amend") return true;
+        return false;
+    }
+    return false;
+}
+
+bool confirm_destructive(const std::string &line) {
+    auto tok = split_words(line);
+    if (!is_destructive(tok)) return false;
+    size_t s = 0;
+    if (tok.size() >= 2 && tok[0] == "git") s = 1;
+    if (s >= tok.size()) return false;
+    const std::string &c = tok[s];
+
+    if (c == "branch") {
+        for (size_t i = s + 1; i < tok.size(); i++) {
+            if (tok[i] == "-d" || tok[i] == "-D" || tok[i] == "--delete") {
+                std::string br = (i + 1 < tok.size()) ? tok[i + 1] : "";
+                std::cout << "✿ This will delete branch " << br << ". Continue? [y/N] " << std::flush;
+                break;
+            }
+        }
+    } else if (c == "stash") {
+        std::cout << "✿ This will permanently remove stash entries. Continue? [y/N] " << std::flush;
+    } else if (c == "rm") {
+        std::cout << "✿ This will remove file(s) from disk. Continue? [y/N] " << std::flush;
+    } else if (c == "tag") {
+        for (size_t i = s + 1; i < tok.size(); i++) {
+            if (tok[i] == "-d" || tok[i] == "--delete") {
+                std::string tg = (i + 1 < tok.size()) ? tok[i + 1] : "";
+                std::cout << "✿ This will delete tag " << tg << ". Continue? [y/N] " << std::flush;
+                break;
+            }
+        }
+    } else if (c == "commit") {
+        std::cout << "✿ This will rewrite the most recent commit. Continue? [y/N] " << std::flush;
+    } else {
+        return false; // known-bad path handled by push.cpp etc.
+    }
+
+    std::string reply;
+    std::getline(std::cin, reply);
+    if (reply != "y" && reply != "Y") {
+        std::cout << "✿ Cancelled.\n";
+        return true; // handled / skip fork
+    }
     return false;
 }
 

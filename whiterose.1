@@ -1,4 +1,4 @@
-.TH WHITEROSE 1 "2026-07-13" "1.1.0" "User Commands"
+.TH WHITEROSE 1 "2026-07-13" "1.2.0" "User Commands"
 .SH NAME
 whiterose \- git-aware safety shell for developers
 .SH SYNOPSIS
@@ -17,19 +17,34 @@ Smart \fBpull\fR (rebase on clean tree, merge if dirty)
 Color\-coded \fBstatus\fR reformat
 .IP \(bu 3
 Automatic backups before destructive commands (reset \-\-hard,
-checkout \-\-, clean \-f*, force push, rebase)
+checkout \-\-, clean \-f*, force push, rebase, branch \-d/\-D,
+stash drop/clear, rm, tag \-d, commit \-\-amend)
 .IP \(bu 3
 \fBundo\fR command to restore the most recent backup
 .IP \(bu 3
+\fBbackups\fR command to list all saved backups
+.IP \(bu 3
+\fBconfig reload\fR to re\-read .whiterose.toml without restart
+.IP \(bu 3
 Merge conflict display and lockfile auto\-fix
 .IP \(bu 3
-Commit guard (blocks commit when conflicts remain)
+Commit guard (blocks commit when conflicts remain or message is empty)
 .IP \(bu 3
 Protected branch confirmation
+.IP \(bu 3
+Clean preview (shows what \-f will delete before running)
+.IP \(bu 3
+Reset preview (shows how many commits will be discarded)
+.IP \(bu 3
+Pretty \fBlog\fR, \fBdiff\fR, \fBshow\fR, \fBreflog\fR formatting
 .IP \(bu 3
 Novice mode with plain\-language explanations
 .IP \(bu 3
 Beginner aliases: new\-branch, switch, save, sync, share
+.IP \(bu 3
+History persistence across restarts (~/.whiterose_history)
+.IP \(bu 3
+Ctrl\-C passthrough (doesn't kill whiterose, only the child)
 .SH OPTIONS
 .TP
 \fB\-\-help\fR, \fB\-h\fR
@@ -58,14 +73,18 @@ git checkout \-b <name>
 \fBswitch <name>\fR
 git checkout <name>
 .TP
-\fBsave\fR
-git add \-A && git commit
+\fBsave\fR [\-m <msg>]
+git add \-A && git commit (prompts if no \-m)
 .TP
 \fBsync\fR
 git pull
 .TP
 \fBshare\fR
 git push
+.SH FILES
+.TP
+\fI~/.whiterose_history\fR
+Command history persisted across sessions.
 .SH ENVIRONMENT
 The shell uses file descriptor 3 internally for cwd tracking.
 .SH BUGS

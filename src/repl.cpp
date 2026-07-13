@@ -8,6 +8,7 @@
 #include "interceptors/destructive.hpp"
 #include "interceptors/conflicts.hpp"
 #include "interceptors/novice.hpp"
+#include "interceptors/format.hpp"
 #include "completion.hpp"
 #include <iostream>
 #include <string>
@@ -58,12 +59,28 @@ void print_help(bool inside) {
         "  checkout --,\n"
         "  clean -f*,\n"
         "  rebase            creates an automatic backup before running\n"
+        "  branch -d/-D      creates backup before branch deletion\n"
+        "  stash drop/clear  creates backup before dropping stashes\n"
+        "  rm                creates backup before removing files\n"
+        "  tag -d            creates backup before deleting tags\n"
+        "  commit --amend    creates backup before rewriting latest commit\n"
+        "  clean -f*         shows preview before executing\n"
+        "  reset (soft/mixed) shows how many commits will be discarded\n"
+        "  commit -m ''      blocked (empty message)\n"
+        "  commit            blocked if unresolved merge conflicts remain\n"
+        "  log               pretty with oneline/graph/decorate\n"
+        "  diff              colorized diff\n"
+        "  show              colorized commit\n"
+        "  reflog            colorized reflog\n"
         "  undo              restores your most recent backup\n"
-        "  commit            blocked if unresolved merge conflicts remain\n\n"
+        "  backups           lists all saved backups\n"
+        "  config reload     re-reads .whiterose.toml without restart\n"
+        "  checkout -        warns if dirty tree\n\n"
         "Beginner aliases (always on):\n"
         "  new-branch <name>  creates a new branch and switches to it\n"
         "  switch <name>      switches to an existing branch\n"
         "  save               stages all changes and commits them\n"
+        "  save -m <msg>      save with a message (non-interactive)\n"
         "  sync               pull latest changes from remote\n"
         "  share              push your changes to the remote\n"
         "  teach on/off       toggle plain-language explanations\n\n"
@@ -123,8 +140,120 @@ void run_repl(const std::string &REPO_ROOT) {
         // commit guard
         if (handle_commit_guard(cmd_line)) continue;
 
+        // --- safety guards ---
+        // git commit -m "" (empty message)
+        {
+            auto tk = split_words(cmd_line);
+            size_t cs = 0;
+            if (tk.size() >= 2 && tk[0] == "git") cs = 1;
+            if (cs < tk.size() && tk[cs] == "commit") {
+                bool has_m = false, empty_m = false;
+                for (size_t ti = cs + 1; ti < tk.size(); ti++) {
+                    if (tk[ti] == "-m" || tk[ti] == "--message") {
+                        has_m = true;
+                        if (ti + 1 < tk.size()) {
+                            std::string m = tk[ti + 1];
+                            if (m.size() >= 2 && m.front() == '"' && m.back() == '"')
+                                m = m.substr(1, m.size() - 2);
+                            if (m.empty() || m == "") empty_m = true;
+                        }
+                    }
+                }
+                if (!has_m && !tk[cs].empty() && tk[cs] == "commit") {
+                    // bare commit — check if msg was passed interactively
+                    bool via_s = false;
+                    for (size_t ti = cs + 1; ti < tk.size(); ti++)
+                        if (tk[ti] == "-s" || tk[ti] == "--signoff") via_s = true;
+                    if (!via_s) {} // fine, git will open editor
+                }
+                if (empty_m) {
+                    std::cout << "✿ Commit message is empty. Cancelling commit.\n";
+                    continue;
+                }
+            }
+        }
+
+        // git checkout - (dash) warning
+        {
+            auto tk = split_words(cmd_line);
+            size_t cs = 0;
+            if (tk.size() >= 2 && tk[0] == "git") cs = 1;
+            if (cs < tk.size() && tk[cs] == "checkout" && cs + 1 < tk.size() && tk[cs + 1] == "-") {
+                std::string dirty = run_capture("git status --porcelain 2>/dev/null");
+                if (!dirty.empty()) {
+                    std::cout << "✿ You have uncommitted changes — switching away" << std::endl;
+                    std::cout << "   with 'checkout -' might cause conflicts if the" << std::endl;
+                    std::cout << "   previous branch has a different state of these files.\n";
+                }
+            }
+        }
+
+        // git clean preview
+        {
+            auto tk = split_words(cmd_line);
+            size_t cs = 0;
+            if (tk.size() >= 2 && tk[0] == "git") cs = 1;
+            if (cs < tk.size() && tk[cs] == "clean") {
+                bool has_f = false;
+                for (size_t ti = cs + 1; ti < tk.size(); ti++)
+                    if (tk[ti][0] == '-' && tk[ti].find('f') != std::string::npos) { has_f = true; break; }
+                if (has_f) {
+                    std::string dry = run_capture((cmd_line + " -n 2>&1").c_str());
+                    if (!dry.empty()) {
+                        std::cout << "✿ Would remove:\n";
+                        size_t p = 0;
+                        while (p < dry.size()) {
+                            auto nl = dry.find('\n', p);
+                            if (nl != std::string::npos) { std::cout << "  " << dry.substr(p, nl - p) << '\n'; p = nl + 1; }
+                            else { std::cout << "  " << dry.substr(p) << '\n'; break; }
+                        }
+                        std::cout << "✿ Proceed? [y/N] " << std::flush;
+                        std::string reply;
+                        std::getline(std::cin, reply);
+                        if (reply != "y" && reply != "Y") { std::cout << "✿ Cancelled.\n"; continue; }
+                    }
+                }
+            }
+        }
+
+        // git reset preview (soft/mixed)
+        {
+            auto tk = split_words(cmd_line);
+            size_t cs = 0;
+            if (tk.size() >= 2 && tk[0] == "git") cs = 1;
+            if (cs < tk.size() && tk[cs] == "reset" && cs + 1 < tk.size()) {
+                bool is_hard = false;
+                for (size_t ti = cs + 1; ti < tk.size(); ti++)
+                    if (tk[ti] == "--hard") { is_hard = true; break; }
+                if (!is_hard) {
+                    // Show what commits would be discarded
+                    std::string target = tk[cs + 1];
+                    // Count commits between target and HEAD
+                    std::string cnt = run_capture(("git rev-list --count " + target + "..HEAD 2>/dev/null").c_str());
+                    if (!cnt.empty()) {
+                        int n = std::stoi(cnt);
+                        if (n > 0) {
+                            std::cout << "✿ Resetting will discard " << n << " commit(s) after " << target << "." << std::endl;
+                            std::cout << "✿ Continue? [y/N] " << std::flush;
+                            std::string reply;
+                            std::getline(std::cin, reply);
+                            if (reply != "y" && reply != "Y") { std::cout << "✿ Cancelled.\n"; continue; }
+                        }
+                    }
+                }
+            }
+        }
+
         // backup before destructive commands
         handle_backup(cmd_line);
+
+        // confirm destructive commands (branch -D, stash drop, rm, tag -d, commit --amend)
+        if (confirm_destructive(cmd_line)) continue;
+
+        // format interceptors (log, diff, show, reflog)
+        std::string fmt_line = cmd_line;
+        handle_format_interceptors(cmd_line, fmt_line);
+        cmd_line = fmt_line;
 
         // normalize bare git subcommands
         normalize_bare_git(cmd_line);
