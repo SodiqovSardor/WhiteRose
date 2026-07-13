@@ -3,6 +3,8 @@
 
   # whiterose ✿
 
+  [![build](https://github.com/SodiqovSardor/WhiteRose/actions/workflows/build.yml/badge.svg)](https://github.com/SodiqovSardor/WhiteRose/actions/workflows/build.yml)
+
   **The git shell with an undo button for the mistakes that normally ruin your day.**
 
   <br/>

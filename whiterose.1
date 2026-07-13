@@ -1,0 +1,74 @@
+.TH WHITEROSE 1 "2026-07-13" "1.1.0" "User Commands"
+.SH NAME
+whiterose \- git-aware safety shell for developers
+.SH SYNOPSIS
+.B whiterose
+[\fI\-\-help\fR | \fI\-\-version\fR]
+.SH DESCRIPTION
+\fBwhiterose\fR is an interactive shell that wraps git with safety
+interceptors. It runs inside a git repository and provides:
+.IP \(bu 3
+Force\-push protection against remote\-ahead commits
+.IP \(bu 3
+Automatic upstream setup on bare \fBpush\fR
+.IP \(bu 3
+Smart \fBpull\fR (rebase on clean tree, merge if dirty)
+.IP \(bu 3
+Color\-coded \fBstatus\fR reformat
+.IP \(bu 3
+Automatic backups before destructive commands (reset \-\-hard,
+checkout \-\-, clean \-f*, force push, rebase)
+.IP \(bu 3
+\fBundo\fR command to restore the most recent backup
+.IP \(bu 3
+Merge conflict display and lockfile auto\-fix
+.IP \(bu 3
+Commit guard (blocks commit when conflicts remain)
+.IP \(bu 3
+Protected branch confirmation
+.IP \(bu 3
+Novice mode with plain\-language explanations
+.IP \(bu 3
+Beginner aliases: new\-branch, switch, save, sync, share
+.SH OPTIONS
+.TP
+\fB\-\-help\fR, \fB\-h\fR
+Display help text and exit.
+.TP
+\fB\-\-version\fR, \fB\-v\fR
+Display version number and exit.
+.SH CONFIG
+Place a \fB.whiterose.toml\fR in the repository root to customize
+behavior:
+.RS
+.PP
+.nf
+protected_branches = ["main", "master"]
+auto_upstream = true
+smart_pull = true
+novice_mode = false
+backup_on_destructive = true
+.fi
+.RE
+.SH ALIASES
+.TP
+\fBnew\-branch <name>\fR
+git checkout \-b <name>
+.TP
+\fBswitch <name>\fR
+git checkout <name>
+.TP
+\fBsave\fR
+git add \-A && git commit
+.TP
+\fBsync\fR
+git pull
+.TP
+\fBshare\fR
+git push
+.SH ENVIRONMENT
+The shell uses file descriptor 3 internally for cwd tracking.
+.SH BUGS
+Report bugs at \fBhttps://github.com/SodiqovSardor/WhiteRose/issues\fR.
+.SH LICENSE
+MIT

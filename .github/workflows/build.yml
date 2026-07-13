@@ -1,0 +1,23 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install deps
+        run: sudo apt-get update -q && sudo apt-get install -y -q libreadline-dev
+      - name: build
+        run: make CXX=g++ CXXFLAGS="-std=c++17 -Wall -Wextra -Werror"
+      - name: check binary
+        run: ./whiterose --version
+      - name: check help
+        run: ./whiterose --help | head -1
+      - name: smoke test (needs a git repo)
+        run: |
+          mkdir /tmp/wr-test && cd /tmp/wr-test
+          git init -q && git config user.email t@t && git config user.name t
+          git commit --allow-empty -q -m init
+          echo exit | timeout 2 ${{ github.workspace }}/whiterose 2>&1 | grep -q "whiterose v" && echo "REPL ok"
